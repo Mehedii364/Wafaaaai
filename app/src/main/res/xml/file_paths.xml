@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <files-path name="wafa_artifacts" path="artifacts/" />
+    <files-path name="wafa_images" path="images/" />
+    <files-path name="wafa_exports" path="exports/" />
+    <cache-path name="wafa_cache" path="/" />
+</paths>

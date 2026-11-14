@@ -1,0 +1,6 @@
+{
+  "name": "WAFA AI",
+  "description": "Personal Multimodal AI Operating System with multi-provider routing, coding and document studios, voice intelligence, and local memory.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,95 @@
+name: Android Debug APK Build
+
+on:
+  push:
+    branches: [ main, master ]
+    paths-ignore:
+      - 'APK_DOWNLOAD/**'
+      - '.build-outputs/**'
+      - 'README.md'
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Run unit & Robolectric tests
+        run: gradle :app:testDebugUnitTest --no-daemon
+
+      - name: Run Android Lint checks
+        run: gradle :app:lintDebug --no-daemon
+
+      - name: Assemble Debug APK
+        run: gradle :app:assembleDebug --no-daemon
+
+      - name: Locate, copy, and validate real Debug APK
+        run: |
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+          if [ ! -f "$APK_PATH" ]; then
+            echo "ERROR: Expected APK not found at $APK_PATH"
+            exit 1
+          fi
+
+          mkdir -p .build-outputs
+          mkdir -p APK_DOWNLOAD
+          cp "$APK_PATH" .build-outputs/app-debug.apk
+          cp "$APK_PATH" APK_DOWNLOAD/app-debug.apk
+
+          ls -lh APK_DOWNLOAD/app-debug.apk
+          file APK_DOWNLOAD/app-debug.apk
+
+          SIZE=$(stat -c%s APK_DOWNLOAD/app-debug.apk)
+          echo "APK size: $SIZE bytes"
+          if [ "$SIZE" -le 100000 ]; then
+            echo "ERROR: APK size is suspiciously small ($SIZE bytes)"
+            exit 1
+          fi
+
+          unzip -t APK_DOWNLOAD/app-debug.apk
+
+          HASH1=$(sha256sum .build-outputs/app-debug.apk | awk '{print $1}')
+          HASH2=$(sha256sum APK_DOWNLOAD/app-debug.apk | awk '{print $1}')
+          echo ".build-outputs SHA256: $HASH1"
+          echo "APK_DOWNLOAD   SHA256: $HASH2"
+          if [ "$HASH1" != "$HASH2" ]; then
+            echo "ERROR: SHA256 mismatch between APK copies!"
+            exit 1
+          fi
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: APK_DOWNLOAD/app-debug.apk
+
+      - name: Commit verified APK to repository
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f .build-outputs/app-debug.apk APK_DOWNLOAD/app-debug.apk
+          git diff --cached --quiet || git commit -m "build: update verified app-debug.apk [skip ci]"
+          git push
